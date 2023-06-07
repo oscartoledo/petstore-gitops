@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: petstore
+  namespace: petstore-prod
+spec:
+  selector:
+    matchLabels:
+      app: petstore
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: petstore
+    spec:
+      containers:
+      - name: petstore
+        image: oscartoledo/petstore:1.0.0
+        ports:
+        - containerPort: 8080

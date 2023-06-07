@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: petstore-application
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/oscartoledo/petstore-gitops.git
+    targetRevision: HEAD
+    path: k8s
+  destination: 
+    server: https://kubernetes.default.svc
+    namespace: petstore-prod
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    automated:
+      selfHeal: true
+      prune: true
