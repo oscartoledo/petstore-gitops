@@ -1,0 +1,97 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: petstore-build
+spec:
+  entrypoint: build-image
+  volumes:
+  - name: kaniko-secret
+    secret:
+      secretName: regcred
+      items:
+        - key: .dockerconfigjson
+          path: config.json
+  volumeClaimTemplates:
+  - metadata:
+      name: repodir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi  
+
+  templates:
+  - name: build-image
+    steps:
+    - - name: clone-repo
+        template: git-clone
+        arguments:
+          parameters:
+          - name: repo
+            value: "https://github.com/oscartoledo/petstore.git"
+    - - name: run-test
+        template: java-jdk-17
+    - - name: build
+        template: build-kaniko
+        arguments:
+          parameters:
+          - name: app_repo
+            value: git://github.com/oscartoledo/petstore.git
+          - name: container_image
+            value: oscartoledo/petstore
+          - name: container_tag
+            value: "1.0.0"
+
+  - name: git-clone
+    inputs:
+      parameters:
+      - name: repo
+    container:
+      image: bitnami/git
+      command: [ git, clone ]
+      args: ["{{inputs.parameters.repo}}", "/mnt/vol"]
+      volumeMounts:
+      - name: repodir
+        mountPath: /mnt/vol
+      resources: 
+        limits:
+          memory: 32Mi
+          cpu: 100m
+
+  - name: java-jdk-17
+    container:
+      image: eclipse-temurin:17-jdk-alpine
+      command: [sh, -c]
+      args: [ "cd /mnt/vol && ./gradlew --no-daemon --info --build-cache --parallel test" ]
+      volumeMounts:
+      - name: repodir
+        mountPath: /mnt/vol
+      resources: 
+        limits:
+          memory: 1Gi
+          cpu: 500m
+
+  - name: print-message
+    container:
+      image: alpine:latest
+      command: [sh, -c]
+      args: ["echo getting message from volume; find /mnt/vol; ls /mnt/vol; cat /mnt/vol/README.md"]
+      volumeMounts:
+      - name: repodir
+        mountPath: /mnt/vol
+  
+  - name: build-kaniko
+    inputs:
+      parameters:
+      - name: app_repo
+      - name: container_image
+      - name: container_tag
+    container:
+      image: gcr.io/kaniko-project/executor:debug
+      command: [/kaniko/executor]
+      args:
+      - --context={{inputs.parameters.app_repo}}
+      - --destination={{inputs.parameters.container_image}}:{{inputs.parameters.container_tag}}
+      volumeMounts:
+        - name: kaniko-secret
+          mountPath: /kaniko/.docker/

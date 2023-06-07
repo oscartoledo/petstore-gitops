@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterWorkflowTemplate
+metadata:
+  name: git-clone
+spec:
+  templates:
+  - name: git-clone
+    inputs:
+      parameters:
+      - name: repo
+    container:
+      image: bitnami/git
+      command: [ git, clone ]
+      args:
+      - "{{inputs.parameters.repo}}"
+      - "/mnt/vol"
+      volumeMounts:
+        - name: repodir
+          mountPath: /mnt/vol

@@ -1,0 +1,92 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: petstore-build-tmpl-
+spec:
+  entrypoint: build-deploy
+  volumes:
+  - name: kaniko-secret
+    secret:
+      secretName: regcred
+      items:
+        - key: .dockerconfigjson
+          path: config.json
+  - name: github-access
+    secret:
+      secretName: mygithub
+      items:
+        - key: token
+          path: token
+        - key: user
+          path: user
+        - key: email
+          path: email
+  volumeClaimTemplates:
+  - metadata:
+      name: repodir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi  
+
+  templates:
+  - name: build-deploy
+    dag: 
+      tasks: 
+      - name: clone-repo
+        templateRef:
+          name: git-clone
+          template: git-clone
+          clusterScope: true
+        arguments:
+          parameters:
+          - name: repo
+            value: "https://github.com/oscartoledo/petstore.git"
+      - name: run-unit-tests
+        templateRef:
+          name: java-jdk-17
+          template: java-jdk-17
+          clusterScope: true
+        arguments:
+          parameters:
+          - name: command
+            value: "./gradlew --no-daemon --info --build-cache --parallel test"
+        dependencies:
+          - clone-repo
+      - name: build-publish-image
+        templateRef:
+          name: build-image
+          template: build-image
+          clusterScope: true
+        arguments:
+          parameters:
+          - name: app_repo
+            value: git://github.com/oscartoledo/petstore.git
+          - name: container_image
+            value: oscartoledo/petstore
+          - name: container_tag
+            value: "6.0.0"
+        dependencies:
+          - run-unit-tests
+      - name: deploy-production
+        templateRef:
+          name: update-manifest-version
+          template: update-manifest-version
+          clusterScope: true
+        arguments:
+          parameters:
+          - name: environment
+            value: "deployment"
+          - name: repo_owner
+            value: "oscartoledo"
+          - name: repo_name
+            value: "petstore-gitops"
+          - name: image_owner
+            value: "oscartoledo"
+          - name: image_name
+            value: "petstore"
+          - name: tag
+            value: "6.0.0"
+        dependencies:
+          - build-publish-image
