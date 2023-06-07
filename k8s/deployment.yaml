@@ -15,6 +15,39 @@ spec:
     spec:
       containers:
       - name: petstore
-        image: oscartoledo/petstore:1.0.0
+        image: oscartoledo/petstore:3.0.0
         ports:
         - containerPort: 8080
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 2
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 40
+          successThreshold: 1
+          timeoutSeconds: 3
+        command: [ "/bin/sh" ]
+        args:
+          [ '-c', './docker-entrypoint.sh' ]
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 1Gi
+        env:
+          - name: JAVA_TOOL_OPTIONS
+            value: '-XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=60.0'
