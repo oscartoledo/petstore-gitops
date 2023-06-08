@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: petstore
-        image: oscartoledo/petstore:7.0.0
+        image: oscartoledo/petstore:RELEASE-23.06.01
         ports:
         - containerPort: 8080
         livenessProbe:
