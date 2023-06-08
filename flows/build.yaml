@@ -63,10 +63,12 @@ spec:
           parameters:
           - name: app_repo
             value: git://github.com/oscartoledo/petstore.git
-          - name: container_image
-            value: oscartoledo/petstore
-          - name: container_tag
-            value: "6.0.0"
+          - name: image_owner
+            value: "oscartoledo"
+          - name: image_name
+            value: "petstore"
+          - name: image_tag
+            value: "7.0.0"
         dependencies:
           - run-unit-tests
       - name: deploy-production
@@ -87,6 +89,6 @@ spec:
           - name: image_name
             value: "petstore"
           - name: tag
-            value: "6.0.0"
+            value: "7.0.0"
         dependencies:
           - build-publish-image

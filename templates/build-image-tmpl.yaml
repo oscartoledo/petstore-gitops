@@ -8,14 +8,15 @@ spec:
     inputs:
       parameters:
       - name: app_repo
-      - name: container_image
-      - name: container_tag
+      - name: image_owner
+      - name: image_name
+      - name: image_tag
     container:
       image: gcr.io/kaniko-project/executor:debug
       command: [/kaniko/executor]
       args:
       - --context={{inputs.parameters.app_repo}}
-      - --destination={{inputs.parameters.container_image}}:{{inputs.parameters.container_tag}}
+      - --destination={{inputs.parameters.image_owner}}/{{inputs.parameters.image_name}}:{{inputs.parameters.image_tag}}
       volumeMounts:
         - name: kaniko-secret
           mountPath: /kaniko/.docker/
