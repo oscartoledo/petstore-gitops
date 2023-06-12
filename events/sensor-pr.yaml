@@ -1,0 +1,154 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: webhook
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: tagcreated
+      eventSourceName: webhook
+      eventName: petstore-pr-merge
+  triggers:
+    - template:
+        name: webhook-workflow-trigger
+        argoWorkflow:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: petstore-build-tmpl-
+              spec:
+                entrypoint: build-deploy
+
+                volumes:
+                - name: kaniko-secret
+                  secret:
+                    secretName: regcred
+                    items:
+                      - key: .dockerconfigjson
+                        path: config.json
+                - name: github-access
+                  secret:
+                    secretName: mygithub
+                    items:
+                      - key: token
+                        path: token
+                      - key: user
+                        path: user
+                      - key: email
+                        path: email
+                volumeClaimTemplates:
+                - metadata:
+                    name: repodir
+                  spec:
+                    accessModes: [ "ReadWriteOnce" ]
+                    resources:
+                      requests:
+                        storage: 1Gi  
+
+                templates:
+                - name: build-deploy
+                  dag: 
+                    tasks: 
+                    - name: clone-repo
+                      templateRef:
+                        name: git-clone
+                        template: git-clone
+                        clusterScope: true
+                      arguments:
+                        parameters:
+                        - name: repo
+                          value: ""
+                    - name: run-unit-tests
+                      templateRef:
+                        name: java-jdk-17
+                        template: java-jdk-17
+                        clusterScope: true
+                      arguments:
+                        parameters:
+                        - name: command
+                          value: "./gradlew --no-daemon --info --build-cache --parallel test"
+                      dependencies:
+                        - clone-repo
+                    - name: build-publish-image
+                      templateRef:
+                        name: build-image
+                        template: build-image
+                        clusterScope: true
+                      arguments:
+                        parameters:
+                        - name: app_repo
+                          value: ""
+                        - name: image_owner
+                          value: ""
+                        - name: image_name
+                          value: ""
+                        - name: image_tag
+                          value: ""
+                      dependencies:
+                        - run-unit-tests
+                    - name: deploy-production
+                      templateRef:
+                        name: update-manifest-version
+                        template: update-manifest-version
+                        clusterScope: true
+                      arguments:
+                        parameters:
+                        - name: environment
+                          value: "deployment"
+                        - name: repo_owner
+                          value: ""
+                        - name: repo_name
+                          value: "petstore-gitops"
+                        - name: image_owner
+                          value: ""
+                        - name: image_name
+                          value: ""
+                        - name: tag
+                          value: ""
+                      dependencies:
+                        - build-publish-image
+                    
+          parameters:
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.repository.clone_url
+              dest: spec.templates.0.dag.tasks.0.arguments.parameters.0.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.repository.git_url
+              dest: spec.templates.0.dag.tasks.2.arguments.parameters.0.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.repository.owner.login
+              dest: spec.templates.0.dag.tasks.2.arguments.parameters.1.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.repository.name
+              dest: spec.templates.0.dag.tasks.2.arguments.parameters.2.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.name
+              dest: spec.templates.0.dag.tasks.2.arguments.parameters.3.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.repository.owner.login
+              dest: spec.templates.0.dag.tasks.3.arguments.parameters.1.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.repository.owner.login
+              dest: spec.templates.0.dag.tasks.3.arguments.parameters.3.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.repository.name
+              dest: spec.templates.0.dag.tasks.3.arguments.parameters.4.value
+            - src:
+                dependencyName: tagcreated
+                dataKey: body.name
+              dest: spec.templates.0.dag.tasks.3.arguments.parameters.5.value
